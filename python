@@ -1,0 +1,200 @@
+from tkinter import *
+from tkinter import messagebox, ttk, filedialog
+import mysql.connector as mysql
+import csv
+
+# --- Functions ---
+def insertRecord():
+    try:
+        conn = mysql.connect(user="root", password="hope", host="127.0.0.1", database="student")
+        cursor = conn.cursor()
+        sql = "INSERT INTO employee (fname, lname, age, income) VALUES (%s, %s, %s, %s)"
+        val = (fname.get(), lname.get(), age.get(), Income.get())
+        cursor.execute(sql, val)
+        conn.commit()
+        messagebox.showinfo("Success", "Record inserted successfully!")
+        clearFields()
+        showRecords()
+        cursor.close()
+        conn.close()
+    except mysql.Error as err:
+        messagebox.showerror("Error", f"Something went wrong:\n{err}")
+
+def updateRecord():
+    selected = tree.focus()
+    if not selected:
+        messagebox.showwarning("Select Record", "Please select a record to update")
+        return
+    values = tree.item(selected, 'values')
+    try:
+        conn = mysql.connect(user="root", password="hope", host="127.0.0.1", database="student")
+        cursor = conn.cursor()
+        sql = """UPDATE employee 
+                 SET fname=%s, lname=%s, age=%s, income=%s 
+                 WHERE fname=%s AND lname=%s AND age=%s AND income=%s"""
+        val = (fname.get(), lname.get(), age.get(), Income.get(), values[0], values[1], values[2], values[3])
+        cursor.execute(sql, val)
+        conn.commit()
+        messagebox.showinfo("Success", "Record updated successfully!")
+        clearFields()
+        showRecords()
+        cursor.close()
+        conn.close()
+    except mysql.Error as err:
+        messagebox.showerror("Error", f"Something went wrong:\n{err}")
+
+def deleteRecord():
+    selected = tree.focus()
+    if not selected:
+        messagebox.showwarning("Select Record", "Please select a record to delete")
+        return
+    values = tree.item(selected, 'values')
+    try:
+        conn = mysql.connect(user="root", password="hope", host="127.0.0.1", database="student")
+        cursor = conn.cursor()
+        sql = "DELETE FROM employee WHERE fname=%s AND lname=%s AND age=%s AND income=%s"
+        val = (values[0], values[1], values[2], values[3])
+        cursor.execute(sql, val)
+        conn.commit()
+        messagebox.showinfo("Success", "Record deleted successfully!")
+        clearFields()
+        showRecords()
+        cursor.close()
+        conn.close()
+    except mysql.Error as err:
+        messagebox.showerror("Error", f"Something went wrong:\n{err}")
+
+def showRecords(filter_value=""):
+    for row in tree.get_children():
+        tree.delete(row)
+    try:
+        conn = mysql.connect(user="root", password="hope", host="127.0.0.1", database="student")
+        cursor = conn.cursor()
+        if filter_value:
+            sql = """SELECT * FROM employee 
+                     WHERE fname LIKE %s OR lname LIKE %s OR age LIKE %s"""
+            val = (f"%{filter_value}%", f"%{filter_value}%", f"%{filter_value}%")
+            cursor.execute(sql, val)
+        else:
+            cursor.execute("SELECT * FROM employee")
+        rows = cursor.fetchall()
+        for i, row in enumerate(rows):
+            tag = "oddrow" if i % 2 == 0 else "evenrow"
+            tree.insert("", END, values=row, tags=(tag,))
+        cursor.close()
+        conn.close()
+    except mysql.Error as err:
+        messagebox.showerror("Error", f"Something went wrong:\n{err}")
+
+def liveSearch(event):
+    value = search_var.get()
+    showRecords(value)
+
+def selectRecord(event):
+    selected = tree.focus()
+    if selected:
+        values = tree.item(selected, 'values')
+        fname.delete(0, END)
+        fname.insert(0, values[0])
+        lname.delete(0, END)
+        lname.insert(0, values[1])
+        age.delete(0, END)
+        age.insert(0, values[2])
+        Income.delete(0, END)
+        Income.insert(0, values[3])
+
+def clearFields():
+    fname.delete(0, END)
+    lname.delete(0, END)
+    age.delete(0, END)
+    Income.delete(0, END)
+    search_var.set("")
+    showRecords()
+
+def exportToCSV():
+    try:
+        conn = mysql.connect(user="root", password="hope", host="127.0.0.1", database="student")
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM employee")
+        rows = cursor.fetchall()
+        if not rows:
+            messagebox.showwarning("No Data", "No records to export")
+            return
+
+        # Ask user for file location
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", 
+                                                 filetypes=[("CSV files","*.csv")])
+        if file_path:
+            with open(file_path, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(["First Name","Last Name","Age","Income"])
+                writer.writerows(rows)
+            messagebox.showinfo("Exported", f"Data exported successfully to {file_path}")
+        cursor.close()
+        conn.close()
+    except mysql.Error as err:
+        messagebox.showerror("Error", f"Something went wrong:\n{err}")
+
+# --- GUI Setup ---
+win = Tk()
+win.title("Employee Management System")
+win.geometry("600x650")
+win.resizable(False, False)
+win.configure(bg="#f0f4f7")
+
+# Style for Treeview
+style = ttk.Style()
+style.theme_use("clam")
+style.configure("Treeview.Heading", font=("Helvetica", 11, "bold"), background="#4a7a8c", foreground="white")
+style.configure("Treeview", font=("Helvetica", 10), rowheight=25)
+style.map("Treeview", background=[("selected", "#347083")])
+
+# Labels & Entries
+Label(win, text="First Name", bg="#f0f4f7", font=("Helvetica", 10)).grid(row=0, column=0, padx=10, pady=5, sticky=W)
+Label(win, text="Last Name", bg="#f0f4f7", font=("Helvetica", 10)).grid(row=1, column=0, padx=10, pady=5, sticky=W)
+Label(win, text="Age", bg="#f0f4f7", font=("Helvetica", 10)).grid(row=2, column=0, padx=10, pady=5, sticky=W)
+Label(win, text="Income", bg="#f0f4f7", font=("Helvetica", 10)).grid(row=3, column=0, padx=10, pady=5, sticky=W)
+
+fname = Entry(win, width=30)
+lname = Entry(win, width=30)
+age = Entry(win, width=30)
+Income = Entry(win, width=30)
+
+fname.grid(row=0, column=1, padx=10, pady=5)
+lname.grid(row=1, column=1, padx=10, pady=5)
+age.grid(row=2, column=1, padx=10, pady=5)
+Income.grid(row=3, column=1, padx=10, pady=5)
+
+# Buttons
+Button(win, text="Insert", command=insertRecord, width=12, bg="#4a7a8c", fg="white").grid(row=4, column=0, pady=5, padx=10)
+Button(win, text="Update", command=updateRecord, width=12, bg="#4a7a8c", fg="white").grid(row=4, column=1, pady=5, padx=10)
+Button(win, text="Delete", command=deleteRecord, width=12, bg="#d9534f", fg="white").grid(row=5, column=0, pady=5, padx=10)
+Button(win, text="Clear Fields", command=clearFields, width=12, bg="#f0ad4e", fg="white").grid(row=5, column=1, pady=5, padx=10)
+Button(win, text="Export to CSV", command=exportToCSV, width=26, bg="#28a745", fg="white").grid(row=6, column=0, columnspan=2, pady=5)
+Button(win, text="Quit", command=win.destroy, width=26, bg="#6c757d", fg="white").grid(row=7, column=0, columnspan=2, pady=5)
+
+# Search
+search_var = StringVar()
+Label(win, text="Search", bg="#f0f4f7", font=("Helvetica", 10)).grid(row=8, column=0, padx=10, pady=5, sticky=W)
+search_entry = Entry(win, textvariable=search_var, width=30)
+search_entry.grid(row=8, column=1, padx=10, pady=5)
+search_entry.bind("<KeyRelease>", liveSearch)
+
+# Treeview for table
+columns = ("First Name", "Last Name", "Age", "Income")
+tree = ttk.Treeview(win, columns=columns, show="headings")
+for col in columns:
+    tree.heading(col, text=col)
+tree.grid(row=9, column=0, columnspan=2, padx=10, pady=10, sticky=NSEW)
+
+# Add striped row tags
+tree.tag_configure('oddrow', background="white")
+tree.tag_configure('evenrow', background="#e6f2f2")
+
+# Bind select
+tree.bind("<ButtonRelease-1>", selectRecord)
+
+# Populate table initially
+showRecords()
+
+win.mainloop()
