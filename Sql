@@ -1,0 +1,9 @@
+CREATE DATABASE student;
+USE student;
+
+CREATE TABLE employee (
+    fname VARCHAR(50),
+    lname VARCHAR(50),
+    age INT,
+    income FLOAT
+);
